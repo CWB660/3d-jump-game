@@ -189,7 +189,6 @@
         let jumpDirection = { x: 0, z: 0 };
         let autoRestartTimer = null;
         let isSpacePressed = false; // 跟踪空格键状态
-        let directionalLight; // 添加方向光变量到全局作用域
 
         // 初始化场景
         function init() {
@@ -215,27 +214,16 @@
             scene.add(ambientLight);
 
             // 添加方向光
-            directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
             directionalLight.position.set(10, 10, 5);
             directionalLight.castShadow = true;
             directionalLight.shadow.mapSize.width = 2048;
             directionalLight.shadow.mapSize.height = 2048;
-            // 设置阴影相机范围
-            directionalLight.shadow.camera.near = 0.1;
-            directionalLight.shadow.camera.far = 50;
-            directionalLight.shadow.camera.left = -20;
-            directionalLight.shadow.camera.right = 20;
-            directionalLight.shadow.camera.top = 20;
-            directionalLight.shadow.camera.bottom = -20;
             scene.add(directionalLight);
-            
-            // 添加阴影相机辅助显示（调试用）
-            // const shadowCameraHelper = new THREE.CameraHelper(directionalLight.shadow.camera);
-            // scene.add(shadowCameraHelper);
 
             // 创建地面
             const groundGeometry = new THREE.PlaneGeometry(200, 200);
-            const groundMaterial = new THREE.MeshPhongMaterial({ color: 0x90EE90 });
+            const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x90EE90 });
             const ground = new THREE.Mesh(groundGeometry, groundMaterial);
             ground.rotation.x = -Math.PI / 2;
             ground.position.y = -10;
@@ -271,7 +259,7 @@
             
             // 底座
             const baseGeometry = new THREE.CylinderGeometry(0.4, 0.5, 0.3, 16);
-            const baseMaterial = new THREE.MeshPhongMaterial({ color: 0x8B4513 });
+            const baseMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
             const base = new THREE.Mesh(baseGeometry, baseMaterial);
             base.position.y = 0.15;
             base.castShadow = true;
@@ -279,7 +267,7 @@
             
             // 身体
             const bodyGeometry = new THREE.CylinderGeometry(0.3, 0.4, 0.8, 16);
-            const bodyMaterial = new THREE.MeshPhongMaterial({ color: 0xF5F5DC });
+            const bodyMaterial = new THREE.MeshLambertMaterial({ color: 0xF5F5DC });
             const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
             body.position.y = 0.7;
             body.castShadow = true;
@@ -287,7 +275,7 @@
             
             // 头部
             const headGeometry = new THREE.SphereGeometry(0.25, 16, 12);
-            const headMaterial = new THREE.MeshPhongMaterial({ color: 0xF5F5DC });
+            const headMaterial = new THREE.MeshLambertMaterial({ color: 0xF5F5DC });
             const head = new THREE.Mesh(headGeometry, headMaterial);
             head.position.y = 1.25;
             head.castShadow = true;
@@ -295,7 +283,7 @@
             
             // 顶部装饰
             const topGeometry = new THREE.ConeGeometry(0.15, 0.3, 8);
-            const topMaterial = new THREE.MeshPhongMaterial({ color: 0xFFD700 });
+            const topMaterial = new THREE.MeshLambertMaterial({ color: 0xFFD700 });
             const top = new THREE.Mesh(topGeometry, topMaterial);
             top.position.y = 1.55;
             top.castShadow = true;
@@ -414,7 +402,7 @@
             
             // 树干
             const trunkGeometry = new THREE.CylinderGeometry(0.3, 0.4, 3);
-            const trunkMaterial = new THREE.MeshPhongMaterial({ color: 0x8B4513 });
+            const trunkMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
             const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
             trunk.position.y = 1.5;
             trunk.castShadow = true;
@@ -422,7 +410,7 @@
             
             // 树叶
             const leavesGeometry = new THREE.SphereGeometry(1.5, 8, 6);
-            const leavesMaterial = new THREE.MeshPhongMaterial({ color: 0x228B22 });
+            const leavesMaterial = new THREE.MeshLambertMaterial({ color: 0x228B22 });
             const leaves = new THREE.Mesh(leavesGeometry, leavesMaterial);
             leaves.position.y = 3.5;
             leaves.castShadow = true;
@@ -434,7 +422,7 @@
         // 创建石头
         function createRock() {
             const rockGeometry = new THREE.DodecahedronGeometry(0.3 + Math.random() * 0.4);
-            const rockMaterial = new THREE.MeshPhongMaterial({ color: 0x808080 });
+            const rockMaterial = new THREE.MeshLambertMaterial({ color: 0x808080 });
             const rock = new THREE.Mesh(rockGeometry, rockMaterial);
             rock.position.y = 0.3;
             rock.castShadow = true;
@@ -448,7 +436,7 @@
             
             // 花茎
             const stemGeometry = new THREE.CylinderGeometry(0.02, 0.02, 0.8);
-            const stemMaterial = new THREE.MeshPhongMaterial({ color: 0x228B22 });
+            const stemMaterial = new THREE.MeshLambertMaterial({ color: 0x228B22 });
             const stem = new THREE.Mesh(stemGeometry, stemMaterial);
             stem.position.y = 0.4;
             flowerGroup.add(stem);
@@ -456,7 +444,7 @@
             // 花朵
             const flowerGeometry = new THREE.SphereGeometry(0.15, 6, 4);
             const flowerColors = [0xFF69B4, 0xFF1493, 0xFFB6C1, 0xFFC0CB, 0xFFFF00];
-            const flowerMaterial = new THREE.MeshPhongMaterial({ 
+            const flowerMaterial = new THREE.MeshLambertMaterial({ 
                 color: flowerColors[Math.floor(Math.random() * flowerColors.length)] 
             });
             const flower = new THREE.Mesh(flowerGeometry, flowerMaterial);
@@ -486,7 +474,7 @@
         // 创建单个平台
         function createPlatform(x, y, z, color, isStart = false) {
             const geometry = new THREE.BoxGeometry(2, 0.5, 2);
-            const material = new THREE.MeshPhongMaterial({ color: color });
+            const material = new THREE.MeshLambertMaterial({ color: color });
             const platform = new THREE.Mesh(geometry, material);
             platform.position.set(x, y, z);
             platform.castShadow = true;
@@ -617,30 +605,6 @@
             camera.position.y = player.position.y + 8;
             camera.position.z = player.position.z + 8;
             camera.lookAt(player.position);
-            
-            // 更新阴影相机跟随主角
-            directionalLight.position.set(
-                player.position.x + 10,
-                player.position.y + 10,
-                player.position.z + 5
-            );
-            directionalLight.target.position.set(
-                player.position.x,
-                player.position.y,
-                player.position.z
-            );
-            directionalLight.target.updateMatrixWorld();
-            
-            // 更新阴影相机位置跟随主角
-            const shadowCam = directionalLight.shadow.camera;
-            shadowCam.position.set(
-                player.position.x + 10,
-                player.position.y + 10,
-                player.position.z + 5
-            );
-            shadowCam.lookAt(player.position.x, player.position.y, player.position.z);
-            shadowCam.updateMatrixWorld();
-            shadowCam.updateProjectionMatrix();
             
             // 更新蓄力压缩效果
             if (isCharging) {
