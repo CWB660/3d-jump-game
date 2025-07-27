@@ -10,6 +10,8 @@ GLM-4.5 的代码生成能力令人印象深刻！几乎达到了 Claude 4 的�
 
 这是一个使用 Three.js 开发的3D跳一跳游戏，采用点击蓄力跳跃的玩法。
 
+![Demo](./demo.png)
+
 ## 🎮 在线体验
 
 [点击这里](https://cwb660.github.io/3d-jump-game/) 在线体验
