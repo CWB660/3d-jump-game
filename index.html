@@ -33,6 +33,28 @@
             border: 1px solid rgba(255, 255, 255, 0.8);
             transition: all 0.3s ease;
         }
+        #highScore {
+            position: absolute;
+            top: 115px;
+            left: 30px;
+            color: #666;
+            font-size: 18px;
+            font-weight: 500;
+            z-index: 100;
+            background: rgba(255, 255, 255, 0.85);
+            padding: 8px 16px;
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 15px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            transition: all 0.3s ease;
+        }
+        #highScore.new-record {
+            color: #ff6b6b;
+            background: rgba(255, 107, 107, 0.1);
+            border: 1px solid rgba(255, 107, 107, 0.3);
+            transform: scale(1.1);
+        }
         #instructions {
             position: absolute;
             top: 30px;
@@ -40,7 +62,7 @@
             color: #666;
             font-size: 13px;
             z-index: 100;
-            text-align: right;
+            text-align: left;
             font-weight: 500;
             background: rgba(255, 255, 255, 0.9);
             padding: 10px 16px;
@@ -154,9 +176,10 @@
 <body>
     <div id="gameContainer">
         <div id="score">得分: 0</div>
+        <div id="highScore">最高分: 0</div>
         <div id="instructions">
-            点击蓄力跳跃<br>
-            跳到方块上得分
+            点击或按住空格蓄力跳跃<br>
+            精准着陆：中心绿色+2分(20%)<br>中间黄色+1分(50%)，边缘红色+0分
         </div>
         <div id="wastedText">浪费了</div>
         <div id="powerBar">
@@ -189,6 +212,7 @@
         let jumpDirection = { x: 0, z: 0 };
         let autoRestartTimer = null;
         let isSpacePressed = false; // 跟踪空格键状态
+        let highScore = 0; // 最高分
 
         // 初始化场景
         function init() {
@@ -473,13 +497,42 @@
 
         // 创建单个平台
         function createPlatform(x, y, z, color, isStart = false) {
-            const geometry = new THREE.BoxGeometry(2, 0.5, 2);
+            let geometry;
+            const platformTypes = [
+                { type: 'box', geometry: new THREE.BoxGeometry(2, 0.5, 2), difficulty: 1 },
+                { type: 'cylinder', geometry: new THREE.CylinderGeometry(1, 1, 0.5, 16), difficulty: 1.5 },
+                { type: 'cone', geometry: new THREE.ConeGeometry(1, 1, 8), difficulty: 2 },
+                { type: 'octahedron', geometry: new THREE.OctahedronGeometry(1.2), difficulty: 2.5 },
+                { type: 'tetrahedron', geometry: new THREE.TetrahedronGeometry(1.5), difficulty: 3 }
+            ];
+            
+            let selectedPlatform;
+            if (isStart) {
+                // 起始平台始终是方块
+                selectedPlatform = platformTypes[0];
+            } else {
+                // 随机选择平台类型，难度随分数增加
+                const availableTypes = platformTypes.filter((type, index) => {
+                    if (score < 3) return index <= 1; // 前3分只有方块和圆柱体
+                    if (score < 8) return index <= 2; // 3-8分加入圆锥体
+                    if (score < 15) return index <= 3; // 8-15分加入八面体
+                    return true; // 15分以上所有形状
+                });
+                selectedPlatform = availableTypes[Math.floor(Math.random() * availableTypes.length)];
+            }
+            
+            geometry = selectedPlatform.geometry;
             const material = new THREE.MeshLambertMaterial({ color: color });
             const platform = new THREE.Mesh(geometry, material);
             platform.position.set(x, y, z);
             platform.castShadow = true;
             platform.receiveShadow = true;
-            platform.userData = { isLanded: false, isStart: isStart };
+            platform.userData = { 
+                isLanded: false, 
+                isStart: isStart,
+                type: selectedPlatform.type,
+                difficulty: selectedPlatform.difficulty
+            };
             scene.add(platform);
             return platform;
         }
@@ -623,8 +676,43 @@
             
             for (let i = currentPlatformIndex + 1; i < platforms.length; i++) {
                 const platform = platforms[i];
-                const platformTop = platform.position.y + 0.25;
-                const platformBottom = platform.position.y - 0.25;
+                const platformType = platform.userData.type;
+                const platformDifficulty = platform.userData.difficulty;
+                
+                // 根据平台类型计算着陆区域和高度
+                let landingRadius, platformTop, platformBottom;
+                
+                switch (platformType) {
+                    case 'box':
+                        landingRadius = 1;
+                        platformTop = platform.position.y + 0.25;
+                        platformBottom = platform.position.y - 0.25;
+                        break;
+                    case 'cylinder':
+                        landingRadius = 0.9;
+                        platformTop = platform.position.y + 0.25;
+                        platformBottom = platform.position.y - 0.25;
+                        break;
+                    case 'cone':
+                        landingRadius = 0.7;
+                        platformTop = platform.position.y + 0.5;
+                        platformBottom = platform.position.y - 0.1;
+                        break;
+                    case 'octahedron':
+                        landingRadius = 0.6;
+                        platformTop = platform.position.y + 0.8;
+                        platformBottom = platform.position.y - 0.8;
+                        break;
+                    case 'tetrahedron':
+                        landingRadius = 0.5;
+                        platformTop = platform.position.y + 1.0;
+                        platformBottom = platform.position.y - 0.5;
+                        break;
+                    default:
+                        landingRadius = 1;
+                        platformTop = platform.position.y + 0.25;
+                        platformBottom = platform.position.y - 0.25;
+                }
                 
                 // 检查垂直位置
                 if (playerBottom <= platformTop && playerBottom >= platformBottom) {
@@ -632,7 +720,7 @@
                     const dx = Math.abs(player.position.x - platform.position.x);
                     const dz = Math.abs(player.position.z - platform.position.z);
                     
-                    if (dx < 1 && dz < 1) {
+                    if (dx < landingRadius && dz < landingRadius) {
                         // 成功着陆
                         landOnPlatform(i);
                         return;
@@ -660,10 +748,36 @@
             // 更新得分和平台状态
             const platform = platforms[platformIndex];
             if (!platform.userData.isLanded) {
-                score++;
+                const difficulty = platform.userData.difficulty;
+                const points = Math.floor(difficulty); // 根据难度给予分数
+                
+                // 计算落点位置并设置颜色
+                const landingZone = calculateLandingZone(player.position, platform);
+                const zoneColor = getLandingZoneColor(landingZone);
+                platform.material.color.setHex(zoneColor);
+                
+                // 根据落点精确度给予额外分数奖励
+                const accuracyBonus = getAccuracyBonus(landingZone);
+                const totalPoints = points + accuracyBonus;
+                
+                score += totalPoints;
                 platform.userData.isLanded = true;
-                platform.material.color.setHex(0x888888); // 变色
+                platform.userData.landingZone = landingZone;
                 updateScore();
+                
+                // 根据落点区域显示相应的得分特效
+                if (landingZone === 'poor') {
+                    // 红色位：只显示基础+1特效
+                    showScorePopup();
+                } else {
+                    // 黄色位和绿色位：显示总分特效
+                    showSpecialScorePopup(totalPoints);
+                }
+                
+                // 如果是完美着陆，显示额外特效
+                if (landingZone === 'perfect') {
+                    showPerfectLandingEffect();
+                }
             }
             
             currentPlatformIndex = platformIndex;
@@ -691,9 +805,6 @@
             setTimeout(() => {
                 scoreElement.classList.remove('highlight');
             }, 500);
-            
-            // 显示+1浮动特效
-            showScorePopup();
         }
         
         // 显示得分弹出特效
@@ -714,6 +825,166 @@
             }, 1000);
         }
         
+        // 显示特殊得分弹出特效
+        function showSpecialScorePopup(points) {
+            const popup = document.createElement('div');
+            popup.className = 'score-popup special-score';
+            popup.textContent = '+' + points;
+            popup.style.color = '#FFD700';
+            popup.style.fontSize = '32px';
+            popup.style.fontWeight = 'bold';
+            popup.style.textShadow = '0 0 10px rgba(255, 215, 0, 0.8)';
+            document.getElementById('gameContainer').appendChild(popup);
+            
+            // 获取主角在屏幕上的位置
+            const playerScreenPos = getScreenPosition(player);
+            popup.style.left = playerScreenPos.x + 'px';
+            popup.style.top = (playerScreenPos.y - 60) + 'px';
+            
+            // 1.5秒后移除元素
+            setTimeout(() => {
+                document.getElementById('gameContainer').removeChild(popup);
+            }, 1500);
+        }
+        
+        // 计算落点区域
+        function calculateLandingZone(playerPos, platform) {
+            const platformType = platform.userData.type;
+            let platformSize;
+            
+            // 根据平台类型获取尺寸
+            switch (platformType) {
+                case 'box':
+                    platformSize = 2;
+                    break;
+                case 'cylinder':
+                    platformSize = 2;
+                    break;
+                case 'cone':
+                    platformSize = 2;
+                    break;
+                case 'octahedron':
+                    platformSize = 2.4;
+                    break;
+                case 'tetrahedron':
+                    platformSize = 3;
+                    break;
+                default:
+                    platformSize = 2;
+            }
+            
+            // 计算玩家相对于平台中心的距离
+            const dx = Math.abs(playerPos.x - platform.position.x);
+            const dz = Math.abs(playerPos.z - platform.position.z);
+            const distance = Math.sqrt(dx * dx + dz * dz);
+            
+            // 计算距离比例
+            const maxDistance = platformSize / 2;
+            const distanceRatio = distance / maxDistance;
+            
+            // 根据距离判断落点区域
+            if (distanceRatio <= 0.2) {
+                return 'perfect'; // 中间20% - 完美着陆
+            } else if (distanceRatio <= 0.7) {
+                return 'good'; // 20%-70% - 良好着陆
+            } else {
+                return 'poor'; // 70%之外 - 勉强着陆
+            }
+        }
+        
+        // 获取落点区域颜色
+        function getLandingZoneColor(landingZone) {
+            switch (landingZone) {
+                case 'perfect':
+                    return 0x00FF00; // 鲜艳绿色
+                case 'good':
+                    return 0xFFFF00; // 鲜艳黄色
+                case 'poor':
+                    return 0xFF0000; // 鲜艳红色
+                default:
+                    return 0x888888; // 默认灰色
+            }
+        }
+        
+        // 获取精确度奖励分数
+        function getAccuracyBonus(landingZone) {
+            switch (landingZone) {
+                case 'perfect':
+                    return 2; // 完美着陆额外+2分
+                case 'good':
+                    return 1; // 良好着陆额外+1分
+                case 'poor':
+                    return 0; // 勉强着陆无额外分数
+                default:
+                    return 0;
+            }
+        }
+        
+        // 显示完美着陆特效
+        function showPerfectLandingEffect() {
+            // 创建星星爆炸效果
+            for (let i = 0; i < 8; i++) {
+                const star = document.createElement('div');
+                star.style.position = 'absolute';
+                star.style.color = '#FFD700';
+                star.style.fontSize = '20px';
+                star.style.fontWeight = 'bold';
+                star.style.textShadow = '0 0 5px rgba(255, 215, 0, 0.8)';
+                star.style.pointerEvents = 'none';
+                star.style.zIndex = '300';
+                star.textContent = '✨';
+                
+                // 获取主角在屏幕上的位置
+                const playerScreenPos = getScreenPosition(player);
+                star.style.left = playerScreenPos.x + 'px';
+                star.style.top = playerScreenPos.y + 'px';
+                
+                // 随机方向动画
+                const angle = (Math.PI * 2 * i) / 8;
+                const distance = 50 + Math.random() * 30;
+                const endX = playerScreenPos.x + Math.cos(angle) * distance;
+                const endY = playerScreenPos.y + Math.sin(angle) * distance;
+                
+                star.style.transition = 'all 0.8s ease-out';
+                document.getElementById('gameContainer').appendChild(star);
+                
+                // 触发动画
+                setTimeout(() => {
+                    star.style.left = endX + 'px';
+                    star.style.top = endY + 'px';
+                    star.style.opacity = '0';
+                    star.style.transform = 'scale(0.5)';
+                }, 10);
+                
+                // 移除元素
+                setTimeout(() => {
+                    document.getElementById('gameContainer').removeChild(star);
+                }, 800);
+            }
+            
+            // 显示"完美!"文字
+            const perfectText = document.createElement('div');
+            perfectText.style.position = 'absolute';
+            perfectText.style.color = '#00FF00';
+            perfectText.style.fontSize = '24px';
+            perfectText.style.fontWeight = 'bold';
+            perfectText.style.textShadow = '0 0 10px rgba(0, 255, 0, 0.8)';
+            perfectText.style.pointerEvents = 'none';
+            perfectText.style.zIndex = '300';
+            perfectText.textContent = '完美!';
+            perfectText.style.animation = 'scoreFloat 1s ease-out forwards';
+            
+            const playerScreenPos = getScreenPosition(player);
+            perfectText.style.left = playerScreenPos.x + 'px';
+            perfectText.style.top = (playerScreenPos.y - 80) + 'px';
+            
+            document.getElementById('gameContainer').appendChild(perfectText);
+            
+            setTimeout(() => {
+                document.getElementById('gameContainer').removeChild(perfectText);
+            }, 1000);
+        }
+        
         // 获取3D对象在屏幕上的位置
         function getScreenPosition(object) {
             const vector = new THREE.Vector3();
@@ -729,6 +1000,9 @@
         // 结束游戏
         function endGame() {
             gameOver = true;
+            
+            // 更新最高分
+            updateHighScore();
             
             // 显示"浪费了"文字
             const wastedText = document.getElementById('wastedText');
@@ -791,6 +1065,7 @@
             // 重置UI
             document.getElementById('wastedText').style.display = 'none';
             updateScore();
+            updateHighScoreDisplay();
             updatePowerBar();
             
             // 重新创建平台和装饰
@@ -805,6 +1080,42 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
+        // 加载最高分
+        function loadHighScore() {
+            const savedHighScore = localStorage.getItem('jumpGameHighScore');
+            if (savedHighScore) {
+                highScore = parseInt(savedHighScore);
+                updateHighScoreDisplay();
+            }
+        }
+        
+        // 保存最高分
+        function saveHighScore() {
+            localStorage.setItem('jumpGameHighScore', highScore.toString());
+        }
+        
+        // 更新最高分
+        function updateHighScore() {
+            if (score > highScore) {
+                highScore = score;
+                saveHighScore();
+                updateHighScoreDisplay(true);
+            }
+        }
+        
+        // 更新最高分显示
+        function updateHighScoreDisplay(isNewRecord = false) {
+            const highScoreElement = document.getElementById('highScore');
+            highScoreElement.textContent = '最高分: ' + highScore;
+            
+            if (isNewRecord) {
+                highScoreElement.classList.add('new-record');
+                setTimeout(() => {
+                    highScoreElement.classList.remove('new-record');
+                }, 2000);
+            }
+        }
+
         // 动画循环
         function animate() {
             requestAnimationFrame(animate);
@@ -812,6 +1123,9 @@
             renderer.render(scene, camera);
         }
 
+        // 加载最高分
+        loadHighScore();
+        
         // 启动游戏
         init();
     </script>
